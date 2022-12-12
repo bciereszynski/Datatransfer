@@ -1,0 +1,164 @@
+1.Łączenie
+UN:SBD_ST_PS7_1
+H: 2001bwrp
+Host: 212.33.90.213
+Port: 1521
+
+2.Tworzenie tabel
+
+CREATE TABLE Customers
+(Customer# NUMBER(4) PRIMARY KEY,
+LastName VARCHAR2(10),
+FirstName VARCHAR2(10),
+Address VARCHAR2(20),
+City VARCHAR2(12),
+State VARCHAR2(2),
+Zip VARCHAR2(5),
+Referred NUMBER(4));
+CREATE TABLE Orders
+(Order# NUMBER(4) PRIMARY KEY,
+Customer# NUMBER(4) REFERENCES CUSTOMERS(Customer#),
+OrderDate DATE,
+ShipDate DATE,
+ShipStreet VARCHAR2(18),
+ShipCity VARCHAR2(15),
+ShipState VARCHAR2(2),
+ShipZip VARCHAR2(5));
+CREATE TABLE Publisher
+(PubID NUMBER(2) PRIMARY KEY,
+Name VarCHAR2(23),
+Contact VARCHAR2(15),
+Phone VARCHAR2(12));
+CREATE TABLE Author
+(AuthorID Varchar2(4) PRIMARY KEY,
+Lname VARCHAR2(10),
+Fname VARCHAR2(10));
+CREATE TABLE Books
+(ISBN VARCHAR2(10) PRIMARY KEY,
+Title VARCHAR2(30),
+PubDate DATE,
+PubID NUMBER(2) REFERENCES PUBLISHER(PubID),
+Cost NUMBER(5,2),
+Retail NUMBER(5,2),
+Category VARCHAR2(12));
+CREATE TABLE Orderitems
+(Order# NUMBER(4) NOT NULL REFERENCES ORDERS(Order#),
+Item# NUMBER(2) NOT NULL,
+ISBN VARCHAR2(10) REFERENCES BOOKS(ISBN),
+Quantity NUMBER(3),
+CONSTRAINT orderitems_pk PRIMARY KEY (Order#,ISBN));
+CREATE TABLE Bookauthor
+(ISBN VARCHAR2(10) REFERENCES BOOKS(ISBN),
+AuthorID VARCHAR2(4) REFERENCES Author(AuthorID),
+CONSTRAINT bookauthor_pk PRIMARY KEY (isbn,authorid));
+CREATE TABLE Promotion
+(Gift varchar2(15),
+Minretail number(5,2),
+Maxretail number(5,2));
+/*0,548s------------z usuwaniem:1,01----------------------------------------------------------------------------------------*/
+
+3.Tworzenie kopii wybranych 2 tablic
+
+
+DROP TABLE ORDERS_CP;
+DROP TABLE CUSTOMERS_CP;
+
+
+Create table customers_cp as select * from customers;
+ALTER TABLE customers_cp
+ADD CONSTRAINT customers_cp_pk PRIMARY KEY (customer#);
+
+CREATE TABLE orders_cp as select * from orders;
+ALTER TABLE orders_cp
+ADD CONSTRAINT orders_cp_pk PRIMARY KEY (order#);
+
+/*--0.287--------------------------------------------------------------------------------------------------*/
+
+4. Dodawanie danych do tablic orginalnych
+/*skrypt na cezie*/
+
+/*--1.676--------------------------------------------------------------------------------------------------*/
+
+5. Dodanie danych do kopii tabeli
+INSERT INTO customers_cp
+SELECT * FROM customers;
+
+/*--0,025--------------------------------------------------------------------------------------------------*/
+
+6. Optymalizacja dodawania danych do kopii tabeli
+
+DROP TABLE CUSTOMERS_CP_optimal;
+Create table customers_cp_optimal as select * from customers_cp WHERE 1=0;
+ALTER TABLE customers_cp_optimal
+ADD CONSTRAINT customers_cp_opt_pk PRIMARY KEY (customer#);
+
+???
+
+7. Ponowny pomiar wprowadzania danych
+???
+
+8.
+
+SELECT c.firstname, o.shipDate
+FROM orders o, customers c
+WHERE o.customer#=c.customer# and o.customer# between 1005 and 1025 and o.shipcity LIKE '%O%'; 
+0,039
+SELECT c.firstname, o.shipDate
+FROM orders_cp o, customers_cp c
+WHERE o.customer#=c.customer# and o.customer# between 1005 and 1025 and o.shipcity LIKE '%O%'; 
+0.024
+RAZEM 0.071
+
+SELECT O.CUSTOMER_ID,O.SHIP_NAME, od.product_id, od.discount
+FROM orders_jz O, orders_details_jz od
+WHERE o.order_id = od.order_id and o.customer_id between 25 and 40 and o.ship_name LIKE '%o%'; 
+/* RAZEM 0,06*/
+/*0,035sec */
+
+SELECT O.CUSTOMER_ID,O.SHIP_NAME, od.product_id, od.discount
+FROM orders O, order_details od
+WHERE o.order_id = od.order_id and o.customer_id between 25 and 40 and o.ship_name LIKE '%o%';
+/*0,038sec */
+/*RAZEM 0,069sec */
+/*----------------------------------------------------------------------------------------------------*/
+SELECT o.customer_id, o.ship_name, od.product_id,od.discount
+FROM orders_bp o,orders_det_bp od
+WHERE o.order_id=od.order_id and extract(YEAR FROM o.order_date)!=1996 and o.ship_name NOT LIKE '%o%';
+/*0,041sec */
+/* z zaprzeczeniem 0,304sec */
+
+SELECT o.customer_id, o.ship_name, od.product_id,od.discount
+FROM orders_jz o,orders_details_jz od
+WHERE o.order_id=od.order_id and extract(YEAR FROM o.order_date)!=1996 and o.ship_name NOT LIKE '%o%';
+/*0,032sec */
+/*RAZEM Z zaprzeczeniem 0,335sec */
+/*RAZEM 0,09sec*/
+
+SELECT c.firstname, o.shipDate
+FROM orders_cp o, customers_cp c
+WHERE o.customer#=c.customer# and extract(YEAR FROM o.orderdate)!=1996 and o.shipcity NOT LIKE '%O%';
+
+SELECT c.company_name, e.employee_id
+FROM employees e, customers c, orders o
+WHERE o.customer_id = c.customer_id and e.employee_id = o.employee_id
+AND NOT EXISTS 
+(SELECT 1
+FROM employees e1, customers c1, orders o1
+WHERE o1.customer_id = c1.customer_id and e1.employee_id = o1.employee_id
+AND e1.city != 'Seattle' and e1.employee_id = e.employee_id
+);
+/*0,116sec */
+
+SELECT c.company_name, e.employee_id
+FROM employees e, customers c, orders o
+WHERE o.customer_id = c.customer_id and e.employee_id = o.employee_id
+AND e.city= 'Seattle';
+/*0,042*/
+
+SELECT o2.customer_id, o2.ship_name, od2.product_id,od2.discount
+FROM orders_bp o2, orders_det_bp od2
+where o2.order_id = o21.order_id and o2.customer_id between 25 and 45 and o2.ship_name LIKE '%o%';
+--0,075sec
+--0,327sec
+alter table orders_bp add constraint pk_order_bp primary key(order_id);
+alter table orders_det_bp add constraint pk_orders_det_bp primary key (order_id,product_id);
